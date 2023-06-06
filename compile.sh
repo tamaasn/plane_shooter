@@ -1,1 +1,1 @@
-g++ main.cpp -o game -lSDL2 -lSDL2_image -lSDL2_ttf -lsqlite3
+g++ main.cpp -o game -lSDL2 -lSDL2_image -lSDL2_ttf 
