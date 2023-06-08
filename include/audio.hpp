@@ -1,10 +1,4 @@
 #include "include_sdl.cpp"
-SDL_AudioDeviceID get_audio_device_id(const char* filename , Uint32 &wavlength , Uint8 *wavbuffer){
-	SDL_AudioSpec wavspec;
-	SDL_LoadWAV(filename , &wavspec , &wavbuffer , &wavlength);
-	SDL_AudioDeviceID deviceid = SDL_OpenAudioDevice(NULL , 0 , &wavspec , NULL , 0);
-	return deviceid;
-}
 
 class Audio{
 	public:

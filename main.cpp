@@ -1,12 +1,11 @@
 //Sorry if the source code is kinda messy :/
 //Source code made by tamaaasn
-
+#define SDL_MAIN_HANDLED
 #include <SDL2/SDL.h>
 #include "include/font.hpp"
 #include "include/objects.hpp"
 #include "include/keys.hpp"
 #include "include/audio.hpp"
-#include "include/ram_counter.hpp"
 #include <string>
 #include <iostream>
 #include <cstdlib>
@@ -17,7 +16,7 @@
 #define ship_max 6
 #define speed 5
 
-//Initializing game's font , window , and render
+//Initializing window , and render
 SDL_Window *window = SDL_CreateWindow("Plane shooter" , SDL_WINDOWPOS_CENTERED , SDL_WINDOWPOS_CENTERED , width , height , 0);
 Uint32 render_flag = SDL_RENDERER_ACCELERATED;
 SDL_Renderer *rend = SDL_CreateRenderer(window , -1 , render_flag);
@@ -28,7 +27,7 @@ Enemies enemies[enemy_max];
 Bullets bullets[bullet_max];
 Ships ships[ship_max];
 
-// Class
+// Classes
 Audio audio;
 Keys key;
 Font font;
@@ -131,13 +130,9 @@ void move_ship(){ // Moving ship
 //This is gameplay
 void game(){
 
-	std::string rss_text;
-	std::string vm_text;
 	std::string score_text = "x0";
 
 	//Loading object and textures
-	SDL_Texture* rss_tex;
-	SDL_Texture* vm_tex;
 	SDL_Texture* score_tex;
 
 	//Configuring rect
@@ -147,24 +142,11 @@ void game(){
 	player.rect.y = height/2;
 	player.src_rect = {0 , 0 , 32 , 40};
 
-	SDL_Rect rss_rect;
-	rss_rect.w = 300;
-	rss_rect.h = 50;
-	rss_rect.x = 0;
-	rss_rect.y = 0;
-	
-	SDL_Rect vm_rect;
-	vm_rect.w = 300;
-	vm_rect.h = 50;
-	vm_rect.x = 0;
-	vm_rect.y = 50;
-
 	SDL_Rect heart_rect;
 	heart_rect.w = 24;
 	heart_rect.h = 24;
 	heart_rect.x = 1;
-	heart_rect.y = 100;
-
+	heart_rect.y = 0;
 	
 	SDL_Rect score_rect;
 	score_rect.w = 32;
@@ -179,20 +161,13 @@ void game(){
 	score_logo.y = heart_rect.y + 32;
 	
 	SDL_Rect score_src_rect = {0,0,32,40};
-
-	font.create_text(&rss_tex , rend , rss_text.c_str());
-	font.create_text(&vm_tex , rend , vm_text.c_str());
 	font.create_text(&score_tex , rend , score_text.c_str());
 
 	//Play audio
 	audio.load("audio/bg.wav");
 	audio.play();
 
-	double rss;
-	double vm;
-	double old_rss = 0;
 	uint64_t score = 0;
-	uint64_t old_score=score;
 	SDL_Event event;
 	bool run=true;
 	int health=5;
@@ -210,30 +185,12 @@ void game(){
 		if (audiostate == 0){
 			audio.play();
 		}
-
-		process_mem_usage(vm , rss);
 		SDL_RenderClear(rend);
 		SDL_RenderCopy(rend , BACKGROUND_TEXTURE  , NULL , NULL);
-		rss_text = "RSS : " + std::to_string(rss);
-		vm_text = "VM : " + std::to_string(vm);
 		
-		if (old_rss != rss){
-			SDL_DestroyTexture(rss_tex);
-			SDL_DestroyTexture(vm_tex);
-			font.create_text(&rss_tex , rend , rss_text.c_str());
-			font.create_text(&vm_tex , rend , vm_text.c_str());
-			std::cout << rss_text << std::endl;
-			std::cout << vm_text << std::endl;
-			old_rss = rss;
-		}
 		
-		if(score != old_score){ // Update score if changed
+		score_text = "x"+std::to_string(score);
 
-			score_text = "x"+std::to_string(score);
-			old_score=score;  
-			SDL_DestroyTexture(score_tex);
-			font.create_text(&score_tex , rend , score_text.c_str());
-		}
 		spawn_enemy();
 		spawn_ship();
 		move_ship();
@@ -315,9 +272,7 @@ void game(){
 
 		SDL_RenderCopy(rend , PLAYER_TEXTURE , &player.src_rect , &player.rect);
 		SDL_RenderCopy(rend , ENEMY_TEXTURE , &score_src_rect , &score_logo);
-		SDL_RenderCopy(rend , score_tex , NULL , &score_rect);
-		SDL_RenderCopy(rend , rss_tex , NULL , &rss_rect);
-		SDL_RenderCopy(rend , vm_tex , NULL , &vm_rect);
+		font.render(rend , score_text.c_str() , &score_rect);
 
 		while (SDL_PollEvent(&event)){ // Handle event
 			switch (event.type){
@@ -365,8 +320,6 @@ void game(){
 		SDL_RenderPresent(rend);
 		SDL_Delay(1000/60);
 	}
-	SDL_DestroyTexture(rss_tex);
-	SDL_DestroyTexture(vm_tex);
 	destroy();
 }
 
