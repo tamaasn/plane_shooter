@@ -17,15 +17,16 @@
 #define speed 5
 
 //Initializing window , and render
-SDL_Window *window = SDL_CreateWindow("Plane shooter" , SDL_WINDOWPOS_CENTERED , SDL_WINDOWPOS_CENTERED , width , height , 0);
-Uint32 render_flag = SDL_RENDERER_ACCELERATED;
-SDL_Renderer *rend = SDL_CreateRenderer(window , -1 , render_flag);
+SDL_Window *window;
+Uint32 render_flag;
+SDL_Renderer *rend;
 
 // Object class
 Player player;
 Enemies enemies[enemy_max];
 Bullets bullets[bullet_max];
 Ships ships[ship_max];
+Enemy_bullets enemy_bullets[bullet_max];
 
 // Classes
 Audio audio;
@@ -35,12 +36,54 @@ Font font;
 
 //Destroy window
 void destroy(){
+	font.destroy();
 	SDL_DestroyRenderer(rend);
 	SDL_DestroyWindow(window);
 	SDL_Quit();
 }
 
+// Game over screen
 
+void gameover(){
+	bool run=true;
+	SDL_Rect gameover_rect;
+	gameover_rect.w=400;
+	gameover_rect.h=60;
+	gameover_rect.x = (width/2)-gameover_rect.w/2;
+	gameover_rect.y = (height/2);
+	
+	SDL_Rect text_rect;
+	text_rect.w=400;
+	text_rect.h=60;
+	text_rect.x = gameover_rect.x;
+	text_rect.y = gameover_rect.y+text_rect.h;
+	
+	SDL_Texture *gameover_tex;
+	SDL_Texture *text_tex;
+	
+	font.create_text(&gameover_tex , rend , "GAMEOVER");
+	font.create_text(&text_tex , rend , "Press ENTER to exit");
+	
+	SDL_Event event;
+	while(run){
+		SDL_RenderClear(rend);
+		SDL_RenderCopy(rend , gameover_tex , NULL , &gameover_rect);
+		SDL_RenderCopy(rend , text_tex , NULL , &text_rect);
+		while(SDL_PollEvent(&event)){
+			switch (event.type){
+				case SDL_KEYDOWN:
+					switch(event.key.keysym.scancode){
+						case SDL_SCANCODE_RETURN:run=false; destroy();
+					}
+					break;
+				case SDL_QUIT: run=false;destroy();break;
+			}
+		}
+		SDL_Delay(1000/60);
+		SDL_RenderPresent(rend);
+	}
+	
+}
 
 void spawn_bullet(){
 
@@ -123,8 +166,19 @@ void move_ship(){ // Moving ship
 
 
 
-
-
+void enemy_shoot(SDL_Rect enemyrect){
+	for(int i=0;i<bullet_max;i++){
+		if (enemy_bullets[i].alive==false){
+			enemy_bullets[i].rect.x = enemyrect.x;
+			enemy_bullets[i].rect.y = enemyrect.y;
+			enemy_bullets[i].rect.w = 16;
+			enemy_bullets[i].rect.h = 32;
+			enemy_bullets[i].alive=true;
+			break;
+		}
+	}
+}
+			
 
 
 //This is gameplay
@@ -174,10 +228,8 @@ void game(){
 	while (run){
 		if (health == 0){
 			run=false;
-			OBJECT_DESTROY_TEXTURES();
-			destroy();
 			audio.destroy();
-			break;
+			gameover();
 		}
 		
 		//Play audio if its over
@@ -205,10 +257,53 @@ void game(){
 				}
 			}
 		}
+		
+		for (int i=0;i<bullet_max;i++){ // Show enemy bullets
+			if (enemy_bullets[i].alive){
+				SDL_RenderCopy(rend , ENEMY_BULLET_TEXTURE , NULL , &enemy_bullets[i].rect);
+				enemy_bullets[i].rect.y += speed+3;
+
+				// Bullet collision
+				for(int j=0;j<bullet_max;j++){
+					if(SDL_HasIntersection(&enemy_bullets[i].rect , &bullets[j].rect)){
+						enemy_bullets[i].alive=false;
+						enemy_bullets[i].rect={0,0,0,0};
+						bullets[j].alive=false;
+						bullets[j].rect={0,0,0,0};
+						break;
+					}
+				}
+
+				if (SDL_HasIntersection(&enemy_bullets[i].rect , &player.rect)){
+					health--;
+					enemy_bullets[i].alive=false;
+					enemy_bullets[i].rect = {0,0,0,0};
+				}
+
+				
+				if (enemy_bullets[i].rect.y > height){
+					enemy_bullets[i].alive=false;
+					enemy_bullets[i].rect = {0,0,0,0};
+				}
+
+			}
+			
+		}
+		
 		for(int i=0;i<enemy_max;i++){ // Show enemy
 			if (enemies[i].alive){
 				SDL_RenderCopy(rend , ENEMY_TEXTURE , &enemies[i].src_rect , &enemies[i].rect);
 				enemies[i].rect.y += speed;
+
+				//Enemy shoot
+				enemies[i].shoot_timer--;
+				if (enemies[i].shoot_timer < 0){
+					enemies[i].shoot_timer = 100;
+					enemy_shoot(enemies[i].rect);
+				}
+				
+
+
 				for (int j=0;j<bullet_max;j++){
 					if (SDL_HasIntersection(&bullets[j].rect , &enemies[i].rect)){
 						enemies[i].alive=false;
@@ -221,9 +316,9 @@ void game(){
 				}
 
 				if (SDL_HasIntersection(&enemies[i].rect , &player.rect)){
-						health--;
-						enemies[i].alive=false;
-						enemies[i].explode=true;
+					health--;
+					enemies[i].alive=false;
+					enemies[i].explode=true;
 				}
 
 				if (enemies[i].rect.y > height){
@@ -288,7 +383,7 @@ void game(){
 						case SDL_SCANCODE_D: key.right=true;break;
 						case SDL_SCANCODE_W: key.top=true;break;
 						case SDL_SCANCODE_SPACE: spawn_bullet();break;
-					};
+					}
 					break;
 				case SDL_KEYUP:
 					switch (event.key.keysym.scancode){
@@ -296,7 +391,7 @@ void game(){
 						case SDL_SCANCODE_S: key.bottom=false;break;
 						case SDL_SCANCODE_D: key.right=false;break;
 						case SDL_SCANCODE_W: key.top=false;break;
-					};
+					}
 					break;
 
 			}
@@ -316,11 +411,24 @@ void game(){
 			player.rect.y += speed;
 		}
 
+		if (player.rect.y < 0){
+			player.rect.y = 0;
+		}
+		if (player.rect.x < 0){
+			player.rect.x = 0;
+		}
+		if (player.rect.y > height-player.rect.h){
+			player.rect.y = height-player.rect.h;
+		}
+		if (player.rect.x > width-player.rect.w){
+			player.rect.x = width-player.rect.w;
+		}
+
 
 		SDL_RenderPresent(rend);
 		SDL_Delay(1000/60);
 	}
-	destroy();
+	OBJECT_DESTROY_TEXTURES();
 }
 
 
@@ -330,6 +438,9 @@ int main(){
 		printf("Error");
 		exit(0);
 	}
+	window = SDL_CreateWindow("Plane shooter" , SDL_WINDOWPOS_CENTERED , SDL_WINDOWPOS_CENTERED , width , height , 0);
+	render_flag = SDL_RENDERER_ACCELERATED;
+	rend = SDL_CreateRenderer(window , -1 , render_flag);
 
 	//Inializing font
 	font.init();
@@ -350,12 +461,12 @@ int main(){
 
 	//Object rect
 	SDL_Rect rect;
-	rect.w = 50;
+	rect.w = 60;
 	rect.h = 50;
 	rect.x = width/2;
-	rect.y = width/2;
+	rect.y = height/2;
 	SDL_Rect rect2;
-	rect2.w = 50;
+	rect2.w = 60;
 	rect2.h = 50;
 	rect2.x = width/2;
 	rect2.y = rect.y+50;
@@ -379,7 +490,6 @@ int main(){
 	while (run){
 		SDL_RenderClear(rend);
 
-		//Changing cursor rect with user choice
 		//Insert textures to render
 		SDL_RenderCopy(rend , BACKGROUND_TEXTURE , NULL , NULL);
 
@@ -403,14 +513,14 @@ int main(){
 					case SDL_SCANCODE_UP:
 							     if (choice++ >=choice_max){
 								     choice=0;
-							     };
+							     }
 							     cursor_rect.y = rect.y + choice*50;
 
 							     break;
 					case SDL_SCANCODE_DOWN:
 							     if (choice-- <= 0){
 								     choice=1;
-							     };
+							     }
 							     cursor_rect.y = rect.y + choice*50;
 
 							     break;
@@ -418,7 +528,7 @@ int main(){
 							     switch(choice){
 								     case 0:run=false;SDL_DestroyTexture(play);SDL_DestroyTexture(quit);SDL_DestroyTexture(cursor);game();break;
 								     case 1: run=false;destroy();break;
-							     };
+							     }
 							     break;
 				}				
 			}
